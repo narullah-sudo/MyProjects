@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Список задач</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .todo-container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 24px;
+            padding: 40px;
+            width: 100%;
+            max-width: 500px;
+            box-shadow: 0 25px 45px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 2.2em;
+            font-weight: 700;
+        }
+
+        .input-container {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 30px;
+        }
+
+        #taskInput {
+            flex: 1;
+            padding: 16px 20px;
+            border: 2px solid #e1e5e9;
+            border-radius: 16px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            background: #fff;
+        }
+
+        #taskInput:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+        }
+
+        #addBtn {
+            padding: 16px 24px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 16px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        #addBtn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        .tasks-container {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .task-item {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 20px;
+            margin-bottom: 12px;
+            background: #f8f9fa;
+            border-radius: 16px;
+            border-left: 4px solid #667eea;
+            transition: all 0.3s ease;
+            animation: slideIn 0.3s ease;
+        }
+
+        .task-item:hover {
+            transform: translateX(4px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+        }
+
+        .task-text {
+            flex: 1;
+            font-size: 16px;
+            color: #333;
+            word-break: break-word;
+        }
+
+        .delete-btn {
+            width: 40px;
+            height: 40px;
+            border: none;
+            border-radius: 12px;
+            background: #ff6b6b;
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            transition: all 0.3s ease;
+        }
+
+        .delete-btn:hover {
+            background: #ff5252;
+            transform: scale(1.1);
+        }
+
+        .empty-state {
+            text-align: center;
+            color: #666;
+            font-size: 18px;
+            padding: 40px;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .loading {
+            text-align: center;
+            color: #666;
+            padding: 20px;
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8;
+        }
+
+        @media (max-width: 480px) {
+            .todo-container {
+                padding: 24px;
+                margin: 10px;
+            }
+
+            h1 {
+                font-size: 1.8em;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="todo-container">
+        <h1>📝 Список задач</h1>
+
+        <div class="input-container">
+            <input type="text" id="taskInput" placeholder="Введите новую задачу..." maxlength="100">
+            <button id="addBtn">➕ Добавить</button>
+        </div>
+
+        <div class="tasks-container" id="tasksContainer">
+            <div class="loading">Загрузка задач...</div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://127.0.0.1:8000';
+        const taskInput = document.getElementById('taskInput');
+        const addBtn = document.getElementById('addBtn');
+        const tasksContainer = document.getElementById('tasksContainer');
+        let tasks = [];
+
+        // Загрузка задач при загрузке страницы
+        window.addEventListener('load', loadTasks);
+
+        // Добавление новой задачи
+        addBtn.addEventListener('click', addTask);
+        taskInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') addTask();
+        });
+
+        async function loadTasks() {
+            try {
+                const response = await fetch(`${API_BASE}/all_tasks`);
+                tasks = await response.json();
+                renderTasks();
+            } catch (error) {
+                console.error('Ошибка загрузки задач:', error);
+                tasksContainer.innerHTML = '<div class="empty-state">Ошибка подключения к серверу</div>';
+            }
+        }
+
+        async function addTask() {
+            const title = taskInput.value.trim();
+            if (!title) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/create_new_task`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ title })
+                });
+
+                if (response.ok) {
+                    taskInput.value = '';
+                    loadTasks(); // Перезагружаем список
+                }
+            } catch (error) {
+                console.error('Ошибка добавления задачи:', error);
+                alert('Ошибка добавления задачи');
+            }
+        }
+
+        function renderTasks() {
+            if (tasks.length === 0) {
+                tasksContainer.innerHTML = '<div class="empty-state">📭 Список задач пуст</div>';
+                return;
+            }
+
+            tasksContainer.innerHTML = tasks.map(task => `
+                <div class="task-item" data-id="${task.id}">
+                    <div class="task-text">${escapeHtml(task.title)}</div>
+                    <button class="delete-btn" onclick="deleteTask(${task.id})" title="Удалить задачу">🗑️</button>
+                </div>
+            `).join('');
+        }
+
+        async function deleteTask(id) {
+
+
+            // Здесь можно добавить DELETE запрос к серверу, если есть эндпоинт
+            await fetch(`${API_BASE}/delete_task/${id}`, { method: 'DELETE' });
+
+            loadTasks(); // Перезагружаем список (удаление на бэкенде)
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+
+</html>
